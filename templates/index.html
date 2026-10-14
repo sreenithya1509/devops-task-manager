@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task Manager · Make room for progress</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='script.js') }}" defer></script>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="/">✓ <span>Task Manager</span></a><span class="badge">DevOps lab <span id="version">…</span></span></header>
+  <main>
+    <section class="intro"><span class="eyebrow">A LITTLE FOCUS. A LOT OF PROGRESS.</span><h1>Make today count.</h1><p>Your tasks, a clear plan, and one less thing on your mind.</p></section>
+    <section class="stats" aria-label="Task statistics">
+      <div><span>Total tasks</span><strong id="total">0</strong></div>
+      <div><span>In progress</span><strong id="pending">0</strong></div>
+      <div><span>Completed</span><strong id="completed">0</strong></div>
+    </section>
+    <section class="workspace">
+      <form id="task-form"><label for="title">What’s your next task?</label><div class="input-row"><input id="title" name="title" maxlength="200" required placeholder="e.g. Deploy my first Kubernetes app" autocomplete="off"><button type="submit" id="add-button">+ Add task</button></div></form>
+      <p id="error" role="alert" hidden></p><p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
+      <div class="list-heading"><h2>Your tasks</h2><button id="refresh" class="quiet" type="button">↻ Refresh</button></div>
+      <div id="tasks" aria-live="polite"></div>
+      <div id="empty" class="empty"><span class="empty-icon">✓</span><h3>A fresh start.</h3><p>Add your first task and take the next step.</p></div>
+    </section>
+    <footer>Built to ship. <span>Flask → Jenkins → Docker → Kubernetes</span><p>Learning demo · Tasks are shared and reset when the server restarts.</p></footer>
+  </main>
+</body>
+</html>

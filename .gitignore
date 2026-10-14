@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+.pytest_cache/
+reports/
+.env
+.env.*
+*.pem
+*.key
+*kubeconfig*
+.kube/
+.docker-auth/
+.rendered-*

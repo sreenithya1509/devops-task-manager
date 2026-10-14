@@ -1,0 +1,8 @@
+workflow-aggregator
+pipeline-model-definition
+git
+github
+credentials-binding
+docker-workflow
+junit
+timestamper
