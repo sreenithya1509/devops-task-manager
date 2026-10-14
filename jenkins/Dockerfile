@@ -11,4 +11,5 @@ RUN case "$(dpkg --print-architecture)" in amd64) arch=amd64;; arm64) arch=arm64
     && install -m 0755 kubectl /usr/local/bin/kubectl && rm kubectl kubectl.sha256
 COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
 RUN jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt
+COPY --from=dockercli /usr/local/libexec/docker/cli-plugins /usr/local/libexec/docker/cli-plugins
 USER jenkins

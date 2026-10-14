@@ -279,16 +279,59 @@ The Jenkins volume itself contains secrets: protect it and do not publish volume
 
 ## 8. Configure and run the pipeline
 
-1. New Item → `task-manager` → Pipeline.
+### Current installation: container `jenkins`, volume `jenkins_home`
+
+The inspected running container uses `devops-task-manager-jenkins:local`, with persistent `jenkins_home`, but no Docker socket mount. Its Docker CLI cannot reach the daemon. It also lacks Buildx. The corrected Jenkins Dockerfile copies the Docker CLI plugins; a separate `devops-task-manager-jenkins:ci-ready` image can be built without replacing the running container.
+
+After reviewing the socket warning in section 6, approve the restart/access change before executing the following **ordinary PowerShell** commands. No Windows administrator privileges are normally needed. This keeps the original stopped container as a backup and reuses the verified named volume; do not delete the volume or run both containers against it simultaneously.
+
+```powershell
+Set-Location 'C:\Users\csree\OneDrive\Documents\CC_project\devops-task-manager'
+docker build -t devops-task-manager-jenkins:ci-ready -f jenkins/Dockerfile jenkins
+if ($LASTEXITCODE -ne 0) { throw 'Jenkins image build failed.' }
+$socketGroup = (docker run --rm -v /var/run/docker.sock:/var/run/docker.sock alpine:3.21 stat -c '%g' /var/run/docker.sock).Trim()
+if ($LASTEXITCODE -ne 0 -or $socketGroup -notmatch '^\d+$') { throw 'Cannot inspect Docker socket group.' }
+docker stop jenkins
+if ($LASTEXITCODE -ne 0) { throw 'Could not stop Jenkins.' }
+docker rename jenkins jenkins-before-ci
+if ($LASTEXITCODE -ne 0) { throw 'Could not preserve the original Jenkins container.' }
+docker run -d --name jenkins --restart unless-stopped --group-add $socketGroup -p 127.0.0.1:8080:8080 -v jenkins_home:/var/jenkins_home -v /var/run/docker.sock:/var/run/docker.sock devops-task-manager-jenkins:ci-ready
+if ($LASTEXITCODE -ne 0) { throw 'New Jenkins failed to start. The stopped original remains as jenkins-before-ci.' }
+docker exec jenkins docker info
+docker exec jenkins docker buildx version
+docker exec jenkins python3 --version
+docker logs --tail 100 jenkins
+```
+
+Existing Jenkins users/settings/jobs are retained in `jenkins_home`. Port 8080 is restricted to localhost and the unused inbound-agent port is omitted. Socket access is powerful even with Jenkins running as a non-root user: only trusted jobs should run here. No Docker TCP daemon exposure, privileged containers, or world-writable socket are required.
+
+### Credentials and job
+
+Add a Jenkins **Username with password** credential named `dockerhub-credentials`: username `sree1509`, Password = a Docker Hub read/write access token. Enter it directly in Jenkins; do not paste it into chat, a command, or a tracked file. Public GitHub checkout needs no GitHub token. If the repository is private, configure its read credential both in the SCM job and the optional `GITHUB_CREDENTIALS_ID` parameter.
+
+Commit/push the updated Jenkinsfile and Jenkins Dockerfile to your existing `main` branch before loading Pipeline from SCM:
+
+```powershell
+git diff --check
+git add Jenkinsfile jenkins/Dockerfile README.md VERIFICATION.md
+git commit -m "Configure Docker publishing pipeline with optional Kubernetes deploy"
+git push origin main
+```
+
+The pipeline defaults to `https://github.com/sreenithya1509/devops-task-manager.git`, branch `main`, and image `sree1509/devops-task-manager`. It publishes an immutable `build-N-COMMIT` tag and optionally `latest` for main only. It does not overwrite your existing `1.0` tag. Kubernetes always uses the immutable tag.
+
+1. Check for an existing project Pipeline job first and reuse it. If missing, New Item → `DevOps-Task-Manager-CI-CD` → Pipeline.
 2. Pipeline definition → **Pipeline script from SCM** → Git.
 3. Repository URL: your actual GitHub URL; choose your GitHub credential if private.
 4. Branch specifier: `*/main`; Script Path: `Jenkinsfile` (repository root is this project folder).
-5. Save and run Build Now once. The initial build registers parameters and will stop with a clear error until required values are set.
-6. Build with Parameters: set `GITHUB_REPO_URL`, `GIT_BRANCH=main`, `DOCKER_IMAGE=yourname/task-manager`; set `GITHUB_CREDENTIALS_ID` for private repositories. Run again.
+5. Save and run Build Now once. The initial build registers parameters and uses the supplied repository/image defaults; configure Docker access and Docker Hub credentials first.
+6. Subsequent runs use Build with Parameters. Keep `DEPLOY_TO_KUBERNETES=false` until Minikube network access and the `minikube-kubeconfig` credential are verified. `PUBLISH_LATEST=true` updates latest only for main.
 
 For future builds/polling, retain repository/image defaults by changing the parameter defaults in your own Jenkinsfile, then commit. Never put a token in a default. The SCM job URL/credentials load Jenkinsfile itself; pipeline parameters control its subsequent source checkout. Keep them pointing at the same trusted repo/branch.
 
-Stages: **Checkout → Install Dependencies → Test → Build Docker Image → Push Docker Image → Deploy to Kubernetes → Verify Deployment**. Failed tests stop later stages and publish JUnit XML whenever generated. Deployment first does server dry-run, applies rendered manifests, waits for rollout, port-forwards the service inside Jenkins, probes health, and asserts `/version` equals the immutable tag. Build reports are archived; the job workspace and temporary login/forward resources are cleaned up. It never prunes unrelated Docker images or deletes the cluster. Failed deployment remains visible for diagnosis; rollback is a deliberate operator action.
+Stages: **Checkout → Check Build Environment → Install Dependencies → Test → Build Docker Image → Verify Docker Image → Push Docker Image**, followed by optional **Deploy to Kubernetes → Verify Deployment**. Preflight verifies daemon/Buildx access; when deployment is enabled it verifies Kubernetes access before building. Failed tests stop later stages and publish JUnit XML whenever generated. A temporary container checks `/health` and the expected `/version` without binding host port 5000, so your running app can stay up. Only the temporary container is removed afterward. Publishing uses a temporary Docker login directory and password-stdin. Optional deployment first does server dry-run, applies rendered manifests, waits for rollout, port-forwards the service inside Jenkins, probes health, and asserts `/version` equals the immutable tag. Build reports are archived; the job workspace and temporary login/forward resources are cleaned up. It never prunes unrelated Docker images or deletes the cluster. Failed deployment remains visible for diagnosis; rollback is a deliberate operator action.
+
+Before enabling Kubernetes deployment, complete sections 5 and 7, connect the current container with `docker network connect minikube jenkins`, and verify the exported kubeconfig on that network. This access change needs explicit approval in the guided setup. Keeping deployment disabled requires no Kubernetes credential and skips both deployment stages.
 
 For logs open job → build number → Console Output; the build page lists Pipeline Steps/stages. Docker/Jenkins logs can be inspected with:
 

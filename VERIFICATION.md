@@ -1,5 +1,23 @@
 # Verification record — 14 October 2026
 
+## Latest pipeline implementation checks
+
+This section supersedes the initial environment limitations below; those are retained as historical records.
+
+- Existing Git remote verified as `https://github.com/sreenithya1509/devops-task-manager.git`.
+- Running containers inspected: `jenkins` uses `devops-task-manager-jenkins:local`; `devops-task-manager` is healthy. Jenkins persists data in the `jenkins_home` named volume.
+- Jenkins Python 3.13.5, Git 2.47.3, Docker CLI 28.5.2, kubectl v1.35.0, and required Pipeline/Git/credentials/JUnit/Timestamper plugins verified.
+- Existing Jenkins has no socket mount or socket group and cannot connect to Docker. Its Buildx plugin was also missing.
+- Jenkinsfile updated in place with actual repository/image defaults, daemon/Buildx preflight, existing tests, build/commit tags, temporary-container health/version check, optional main-only latest publishing, and opt-in Kubernetes deployment (default false).
+- Jenkins Dockerfile now copies CLI plugins. Corrected `devops-task-manager-jenkins:ci-ready` image built successfully; disposable-container check confirms Buildx v0.29.1.
+- Existing tests: **20 passed on Windows** (0.68s) and **20 passed inside the original Linux Jenkins image** (0.50s).
+- Jenkinsfile compiled successfully for Groovy syntax using the controller's bundled compiler without executing it. All multiline shell blocks passed Linux `sh -n`. `git diff --check` passed.
+- Existing application Dockerfile built as a separate `devops-task-manager:ci-check` image with APP_VERSION=ci-check. The exact Python health/version probe extracted from Jenkinsfile passed inside a temporary application container. Container user verified as 10001:10001; temporary container removed.
+- Application and tests were not edited. Original working app and Jenkins containers were not stopped or replaced.
+- Jenkins Declarative validation endpoint returned HTTP 403 without authentication. Groovy syntax compilation is not a full Jenkins Declarative validation or a successful pipeline run.
+- No Jenkins job, credential, Docker Hub push, Git commit/push, or Kubernetes deployment was performed during this update. Container restart/socket access awaits user approval. Docker Hub token must be entered directly into Jenkins as `dockerhub-credentials`.
+- README section 8 contains actual-container instructions preserving the existing volume and original stopped container, plus SCM job and credential setup. Kubernetes remains disabled until its network and credential preflight succeeds.
+
 ## Passed
 
 - Python 3.12.6 and Git available; empty initial workspace inspected.
